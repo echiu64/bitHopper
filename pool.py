@@ -67,8 +67,12 @@ class Pool():
             self.servers[server]['shares'] = int(bitHopper.difficulty.get_difficulty())
             self.servers[server]['ghash'] = -1
             self.servers[server]['duration'] = -1
+            self.servers[server]['duration_share'] = 0
             self.servers[server]['duration_temporal'] = 0
+            self.servers[server]['duration_lastupdate'] = time.time()        
             self.servers[server]['isDurationEstimated'] = False
+            self.servers[server]['isSharesEstimated'] = False
+            self.servers[server]['isSpeedEstimated'] = False
             self.servers[server]['last_pulled'] = time.time()
             self.servers[server]['lag'] = False
             self.servers[server]['api_lag'] = False
@@ -151,6 +155,9 @@ class Pool():
         #If the shares indicate we found a block tell LP
         if shares < prev_shares and shares < 0.10 * diff:
             self.bitHopper.lp.set_owner(server)
+        if self.servers[server]['duration'] < 0 or self.servers[server]['isDurationEstimated'] == True:
+            self.servers[server]['isDurationEstimated'] = True
+            self.estimateDuration(self.servers[server],shares)
         self.servers[server]['shares'] = shares
         self.servers[server]['err_api_count'] = 0
         if self.servers[server]['refresh_time'] > 60*30 and self.servers[server]['role'] not in ['info','backup','backup_latehop']:
@@ -170,6 +177,75 @@ class Pool():
         if time < self.servers[pool]['refresh_limit']:
             time = self.servers[pool]['refresh_limit']
         self.bitHopper.reactor.callLater(time, self.update_api_server, pool)
+
+    def estimateDuration(self, info, shares):
+        self.bitHopper.log_trace('        est_duration for server: ' + str(info))
+        if 'duration_share' not in info:
+            info['duration_share'] = 0
+        
+        if int(info['shares']) == int(self.bitHopper.difficulty.get_difficulty()): return # blah
+        delta = time.time() - info['duration_lastupdate']
+        info['duration_temporal'] += delta
+        if delta <= 0: delta = 1
+        self.bitHopper.log_dbg('        est_duration: temporal/delta: ' + str(info['duration_temporal']) + '/' + str(delta))
+        self.bitHopper.log_dbg('        est_duration: estimateDuration for shares: ' + str(shares) + ' info[shares]: ' + str(info['shares']) + ' duration_share: ' + str(info['duration_share']))
+        if 0.5 * info['shares'] > shares:   # guess next round has come..
+            self.bitHopper.log_trace('        api_extra: estimateDuration: next round ' + str(int(info['shares'])*0.5) + ' > ' + str(shares))
+            if info['ghash'] > 0:
+                # speed already known
+                sharesPerSec = info['ghash'] / 4.0
+                #info['duration_temporal'] = self.updateInterval
+                info['duration_temporal'] = delta
+                info['duration_share'] = sharesPerSec * info['duration_temporal']
+                if duration_forced == False:
+                    info['duration'] = shares / sharesPerSec + 1
+                    if info['shares'] == 10**10:  # in case of re-enabled pool
+                        info['isDurationEstimated'] = True
+                    else:
+                        info['isDurationEstimated'] = False
+                    info['duration_lastupdate'] = time.time()
+            else:
+                # speed not known (not estimated yet) sorry for the magic numbers
+                # FIXME?
+                info['duration_temporal'] = 10
+                info['duration_lastupdate'] = time.time()
+                info['duration_share'] = 10
+                info['ghash'] = 40
+                # 
+                info['duration'] = shares / (info['ghash']/4)
+                info['isSpeedEstimated'] = True
+                info['isDurationEstimated'] = True
+                
+        elif info['shares'] < shares:
+            if info['role'] not in self.api_pull: return 
+            self.bitHopper.log_trace('        est_duration for shares: ' + str(shares) + ' duration_share: ' + str(info['duration_share']))
+            info['duration_share'] = info['duration_share'] + (shares - info['shares'])
+            sharesPerSec = float(info['duration_share']) / info['duration_temporal']
+            oldSpeed = info['ghash'] + 0.01
+            self.bitHopper.log_dbg('        est_duration: sharesPerSec: ' + str(sharesPerSec) + ' / ghash: ' + str(info['ghash']) + ' duration_share: ' + str(info['duration_share']))
+            if info['ghash'] <= 0:
+                difficulty = float(self.bitHopper.difficulty.get_difficulty())
+                factor = 1/((2**224-1)/difficulty*1000000*1000/2**256)
+                factor = factor / 1000 / 1000
+                factor = 1 / factor
+                info['ghash'] =  (sharesPerSec / factor + 0.01) *.90 # for display, not accurate
+                info['isSpeedEstimated'] = True
+                self.bitHopper.log_dbg('        est_duration: ghash/s (est) factor ' + str(factor) + ' estimate ghash/s: ' + str(info['ghash']))
+            if info['duration_temporal'] > 60 and info['isDurationEstimated'] == True:
+                # re-estimate round duration (every 3 minutes)
+                info['duration'] = int(info['shares'] / sharesPerSec)
+                self.bitHopper.log_dbg('            est_duration(180): ' + str(info['duration']))
+                info['duration_lastupdate'] = time.time()
+            if info['duration_temporal'] > 600:
+                # retune to adapt trend (after first 10 minutes, every 6.66 minutes)
+                info['duration_temporal'] = 200
+                info['duration_share'] = int( sharesPerSec * 200 )
+                self.bitHopper.log_dbg('            est_duration(600): ' + str(info['duration']))
+                #if info['isDurationEstimated'] == True and float(abs(oldSpeed - info['ghash']))/oldSpeed < 0.05:
+                    # if estimated speed stabilized (speed delta is within 5%), don't estimate round duration later
+                #    info['isDurationEstimated'] = False
+                info['duration_lastupdate'] = time.time()
+        self.bitHopper.log_msg('        est_duration(f): ' + str(info['duration']))
 
     def selectsharesResponse(self, response, args):
         #self.bitHopper.log_dbg('Calling sharesResponse for '+ args)
@@ -236,7 +312,6 @@ class Pool():
             
         elif server['api_method'] == 're_rateduration':
             # get hashrate and duration to estimate share
-            server['isDurationEstimated'] = True
             ghash = self.get_ghash(server, response)
             if ghash < 0:
                 ghash = 1
@@ -248,9 +323,7 @@ class Pool():
             old = server['last_pulled']
             server['last_pulled'] = time.time()
             diff = server['last_pulled'] - old
-            
-            server['duration_temporal'] = server['duration_temporal'] + diff
-            
+                       
             # new round started or initial estimation
             rate = 0.25 * ghash
             if duration < server['duration'] or server['duration'] < 0: 
@@ -260,6 +333,7 @@ class Pool():
             
             server['ghash'] = ghash
             server['duration'] = duration
+            server['isSharesEstimated'] = True
             
             self.UpdateShares(args,round_shares)
             

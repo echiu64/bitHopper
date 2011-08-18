@@ -73,8 +73,11 @@
 				if(srv["role"].substring(0,4) != "mine" && srv["role"] != 'info' && srv["role"].substring(0,6) != "backup") {
 					return "N/A";
 				}
-				
-				return shares
+				var prefix = "";
+				if (srv["isSharesEstimated"] == true) {
+					prefix ="*";
+				}
+				return prefix + shares
 					+ "<br>"
 					+ fixLength((shares / payload['difficulty'] * 100).toFixed(2), 6)
 					+ "%";
