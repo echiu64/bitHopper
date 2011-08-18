@@ -28,8 +28,6 @@ class LongPoll():
         startlp.start(60*60)
 
     def set_owner(self, server, block = None):
-        if self.bitHopper.pool.servers[server]['role'] == 'mine_deepbit':
-            self.lastBlock = block
         if block == None:
             if self.lastBlock == None:
                 return
@@ -87,6 +85,7 @@ class LongPoll():
         self.blocks[block]={}
         self.bitHopper.lp_callback(work)
         self.blocks[block]["_owner"] = None
+        self.lastBlock = block
 
     def receive(self, body, server):
         self.polled[server].release()
@@ -114,18 +113,17 @@ class LongPoll():
             if block not in self.blocks:
                 if byteswap(block) in self.blocks:
                     block = byteswap(block)
-                else:
-                    self.bitHopper.log_msg('New Block: ' + str(block))
-                    self.bitHopper.log_msg('Block Owner ' + server)
-                    self.add_block(block, work)
-                    if self.bitHopper.lpBot != None:
-                        self.bitHopper.lpBot.announce(str(server), str(block))
+                self.bitHopper.log_msg('New Block: ' + str(block))
+                self.bitHopper.log_msg('Block Owner ' + server)
+                self.add_block(block, work)
+                if self.bitHopper.lpBot != None:
+                    self.bitHopper.lpBot.announce(str(server), str(block))
 
             #Add the lp_penalty if it exists.
             offset = self.pool.servers[server].get('lp_penalty','0')
             self.blocks[block][server] = time.time() + float(offset)
             if self.blocks[block]['_owner'] == None or self.blocks[block][server] < self.blocks[block][self.blocks[block]['_owner']]:
-                self.blocks.set_owner(server,block)
+                self.set_owner(server,block)
 
         except Exception, e:
             output = False
