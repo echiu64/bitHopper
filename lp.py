@@ -50,6 +50,7 @@ class LongPoll():
         if self.bitHopper.pool.servers[server]['role'] == 'mine_deepbit' and old_owner != server:
             old_shares = self.bitHopper.pool.servers[server]['shares']
             self.bitHopper.pool.servers[server]['shares'] = 0
+	    self.bitHopper.scheduler.reset()
             self.bitHopper.select_best_server()
             if '_defer' not in self.blocks[block]:
                 self.blocks[block]['_defer'] = defer.Deferred()
