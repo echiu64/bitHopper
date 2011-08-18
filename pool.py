@@ -146,11 +146,8 @@ class Pool():
 
         #Display output to user when shares change
         if shares != prev_shares:
-            if len(server) == 12:
-                self.bitHopper.log_msg(str(server) +":"+ k)
-            else:
-                self.bitHopper.log_msg(str(server) +":\t"+ k)
-
+            self.bitHopper.log_msg("%s %7s" % (str(server).ljust(12), (":"+ k)) )
+            
         #If the shares indicate we found a block tell LP
         if shares < prev_shares and shares < 0.10 * diff:
             self.bitHopper.lp.set_owner(server)
