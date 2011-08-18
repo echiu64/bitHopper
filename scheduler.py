@@ -338,13 +338,6 @@ class AltSliceScheduler(Scheduler):
    def initData(self,):
       Scheduler.initData(self)
       self.reset() 
-
-   def reset(self,):
-      for server in self.bh.pool.get_servers():
-         info = self.bh.pool.get_entry(server)
-         info['slice'] = -1
-         info['slicedShares'] = 0
-         info['init'] = False
       if (self.bh.options.altsliceroundtimebias == True):
          difficulty = self.bh.difficulty.get_difficulty()
          one_ghash = 1000000 * 1000
@@ -352,6 +345,13 @@ class AltSliceScheduler(Scheduler):
          self.bh.log_msg(' - Target Round Time Bias GHash/s: ' + str(float(target_ghash/one_ghash)), cat=self.name)
          self.target_duration = difficulty * (2**32) / target_ghash
          self.bh.log_msg(" - Target duration: " + str(int(self.target_duration)) + "(s) or " + str(int(self.target_duration/60)) + " minutes", cat=self.name)
+
+   def reset(self,):
+      for server in self.bh.pool.get_servers():
+         info = self.bh.pool.get_entry(server)
+         info['slice'] = -1
+         info['slicedShares'] = 0
+         info['init'] = False
             
    def select_best_server(self,):
       self.bh.log_trace('select_best_server', cat=self.name)
