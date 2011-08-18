@@ -232,7 +232,9 @@ class bitSite(resource.Resource):
         return True
 
     def getChild(self, name, request):
-        if name == 'LP':
+        if name == '':
+            site = self
+        elif name == 'LP':
             site = lpSite(self.bitHopper)
         elif not self.auth(request):
             site = nullsite()
