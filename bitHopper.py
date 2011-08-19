@@ -38,16 +38,16 @@ class BitHopper():
         self.new_server = Deferred()
         self.lpBot = None
         self.reactor = reactor
-        self.difficulty = diff.Difficulty(self)
-        self.pool = pool.Pool(self)
+        self.difficulty = diff.Difficulty(self)           
+        self.pool = pool.Pool(self)     
         self.db = database.Database(self)
+        self.pool.setup(self) 
         self.speed = speed.Speed(self)
         self.stats = stats.Statistics(self)
         self.scheduler = scheduler.Scheduler(self)
         self.getwork_store = getwork_store.Getwork_store(self)
         self.request_store = request_store.Request_store(self)
-        self.data = data.Data(self)
-        self.pool.setup(self)        
+        self.data = data.Data(self)       
         self.lp = lp.LongPoll(self)
         self.auth = None
         self.work = work.Work(self)
@@ -214,7 +214,7 @@ def main():
     parser.add_option('--p2pLP', action='store_true', default=False, help='Starts up an IRC bot to validate LP based hopping.  Must be used with --startLP')
     parser.add_option('--ip', type = str, default='', help='IP to listen on')
     parser.add_option('--auth', type = str, default=None, help='User,Password')
-    options, rest = parser.parse_args()
+    options = parser.parse_args()[0]
 
     if options.trace == True: options.debug = True
 
@@ -223,6 +223,7 @@ def main():
         for s in scheduler.Scheduler.__subclasses__():
             schedulers += ", " + s.__name__
         print "Available Schedulers: " + schedulers[2:]
+        return
 
     bithopper_instance = BitHopper(options)
 

@@ -31,21 +31,16 @@ class LongPoll():
         if block == None:
             if self.lastBlock == None:
                 return
-            old_owner = self.blocks[self.lastBlock]["_owner"]
-            self.blocks[self.lastBlock]["_owner"] = server
-            if '_defer' in self.blocks[self.lastBlock]:
-                self.blocks[self.lastBlock]['_defer'].callback(server)
-            self.blocks[self.lastBlock]['_defer'] = defer.Deferred()
-            self.bitHopper.log_msg('Setting Block Owner ' + server+ ':' + str(self.lastBlock))
-        else:
-            old_owner = self.blocks[block]["_owner"]
-            self.blocks[block]["_owner"] = server
-            if '_defer' in self.blocks[block]:
-                self.blocks[block]['_defer'].callback(server)
-            self.blocks[block]['_defer'] = defer.Deferred()
-            self.bitHopper.log_msg('Setting Block Owner ' + server+ ':' + str(block))
+            block = self.lastBlock
+        
+        old_owner = self.blocks[block]["_owner"]
+        self.blocks[block]["_owner"] = server
+        if '_defer' in self.blocks[block]:
+            self.blocks[block]['_defer'].callback(server)
+        self.blocks[block]['_defer'] = defer.Deferred()
+        self.bitHopper.log_msg('Setting Block Owner ' + server+ ':' + str(block))
 
-        if self.bitHopper.pool.servers[server]['role'] == 'mine_deepbit' and old_owner != server:
+        if server in self.bitHopper.pool.servers and self.bitHopper.pool.servers[server]['role'] == 'mine_deepbit' and old_owner != server:
             old_shares = self.bitHopper.pool.servers[server]['shares']
             self.bitHopper.pool.servers[server]['shares'] = 0
 	    self.bitHopper.scheduler.reset()
