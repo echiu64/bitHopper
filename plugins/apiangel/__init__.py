@@ -20,7 +20,7 @@ class APIAngel():
         eventlet.spawn_n(self.run)
         self.lock = threading.RLock()
             
-    def parseConfig():
+    def parseConfig(self):
         try:
             self.interval = self.bitHopper.config.get('apiangel', 'interval')
             self.reincarnateInterval = self.bitHopper.config.get('apiangel', 'reincarnateInterval')
